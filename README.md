@@ -11,6 +11,7 @@ A robust, enterprise-ready Java application designed to streamline inventory tra
 | **Week 1** | **Project Planning & Architecture Design** | Layered Architecture, Design Patterns (MVC, DAO, Singleton, Factory), 7-Table Relational MySQL DDL, and Scaffolding. | ✅ Complete |
 | **Week 2** | **Core Functionality Implementation** | Library Book Inventory CLI program, Java Collections (`LinkedHashMap`), Full CRUD, Input Validation, Custom Exceptions, and Automated Tests. | ✅ Complete |
 | **Week 3** | **Unit Testing & Debugging** | JUnit 5 Test Suite (34 Tests), Standalone Test Runner, 5 Intentional Debugging Case Studies & Root Cause Analysis (RCA), Code Refactoring. | ✅ Complete |
+| **Week 4** | **Code Refactoring & Optimization** | Builder Pattern, Algorithmic Inverted Index Search ($O(1)$), High-Concurrency `ReentrantReadWriteLock`, Paginated Queries, Centralized `BookValidator`, 38 Tests. | ✅ Complete |
 
 ---
 
@@ -39,7 +40,7 @@ graph TD
 
 ## 📚 Week 2: Library Book Inventory System (Core Implementation)
 
-Week 2 focused on hands-on implementation by creating a menu-driven command-line program that manages a library's book inventory using the **Java Collections Framework**.
+Week 2 created a menu-driven command-line program that manages a library's book inventory using the **Java Collections Framework**.
 
 ```mermaid
 graph TD
@@ -70,17 +71,9 @@ graph TD
 
 ## 🧪 Week 3: Unit Testing and Systematic Debugging
 
-Week 3 focuses on software reliability, rigorous unit testing using **JUnit 5**, boundary value analysis, and intentional bug reproduction and resolution.
+Week 3 established an exhaustive automated testing environment using **JUnit 5** and resolved five intentional defects via Root Cause Analysis (RCA).
 
-### 1. Testing Framework Architecture
-* **JUnit 5 Jupiter Test Suite (`BookServiceUnitTest.java`):**
-  * Employs `@Test`, `@BeforeEach`, `@DisplayName`, `@Nested`, `@ParameterizedTest`, `@ValueSource`.
-  * Isolates test state before each run with clean repository instances.
-  * 34 test cases covering positive flows, boundary conditions, custom exceptions, and regression paths.
-* **Standalone Console Test Runner (`LibraryTestRunner.java`):**
-  * Zero-dependency test harness runnable via raw `javac`/`java`.
-
-### 2. Intentional Bugs & Root Cause Analysis (RCA) Case Studies
+### Intentional Bugs & Root Cause Analysis (RCA) Case Studies
 
 | Bug # | Defect Title & Symptom | Root Cause | Targeted Fix & Refactoring |
 | :---: | :--- | :--- | :--- |
@@ -89,6 +82,38 @@ Week 3 focuses on software reliability, rigorous unit testing using **JUnit 5**,
 | **Bug 3** | **False Rejection of Advance Publisher Releases**<br>Legitimate upcoming editions (current year + 1) thrown as invalid. | Upper year boundary check strictly evaluated `<= currentYear`. | Adjusted boundary to `Year.now().getValue() + 1` accommodating publisher advance release cycles. |
 | **Bug 4** | **Case-Sensitive Substring Matching**<br>Searching "java" returned 0 matches for "Effective Java". | `String.contains()` performs case-sensitive matching by default. | Stream filter converted both target and query strings to lower case before comparison. |
 | **Bug 5** | **Shallow Reference Leak in Collections**<br>`findAll()` returned mutable collection references allowing external alteration. | Missing defensive copying in repository accessor. | Returned defensive ArrayList copies (`new ArrayList<>(storage.values())`) preventing external mutation leaks. |
+
+---
+
+## ⚡ Week 4: Code Refactoring and Performance Optimization
+
+Week 4 focuses on architectural refactoring, algorithmic optimization, concurrency scaling, and eliminating technical debt.
+
+### Core Architectural & Algorithmic Refactorings
+
+```mermaid
+graph LR
+    subgraph Creational
+        B[Book.Builder] --> Book[Book Entity]
+        Book --> toB[toBuilder Method]
+    end
+    subgraph Concurrency
+        RW[ReentrantReadWriteLock] --> Readers[Concurrent Read Locks]
+        RW --> Writers[Exclusive Write Locks]
+    end
+    subgraph Indexing
+        Text[Title / Author Tokens] --> InvIdx[Inverted Hash Index: O 1]
+        InvIdx --> FastSearch[Instant Keyword Retrieval]
+    end
+```
+
+| Refactoring Area | Before Refactoring | After Refactoring | Benefit & Optimization Achieved |
+| :--- | :--- | :--- | :--- |
+| **Creational Pattern** | 4-parameter positional constructor (`new Book(isbn, title, author, year)`) | **Builder Pattern** (`Book.builder()...build()`) + `toBuilder()` | Eliminates telescoping constructors; self-documenting syntax; prevents parameter inversion bugs. |
+| **Search Algorithm** | Brute-force $O(n)$ linear stream scan across all stored entities | **Secondary Inverted Token Index** (`Map<String, Set<String>>`) | Transitions keyword query complexity from $O(n)$ down to **$O(1)$ instantaneous token lookups**. |
+| **Concurrency Architecture** | Coarse instance-level `synchronized` monitor locks | **`ReentrantReadWriteLock`** (Shared Read / Exclusive Write) | Unlocks **non-blocking concurrent reader threads**, eliminating thread contention during reads. |
+| **DRY Validation** | Validation checks scattered across service layer methods | **Centralized `BookValidator`** static utility class | Enforces DRY principle with unified single source of truth for domain rules. |
+| **Memory Allocation** | Monolithic `findAll()` returning unbounded lists | **Paginated Streaming Queries** (`findPaged`) & dynamic Comparators | Slices queries into bounded page buffers ($O(k)$ memory), preventing heap spikes. |
 
 ---
 
@@ -107,7 +132,9 @@ retail-inventory-management-system/
 │   ├── Library_Book_Inventory_Week2_Report.docx       # Week 2 Implementation Document (~1,650 words)
 │   ├── library-inventory-system-week2.zip             # Week 2 Commented Java source package
 │   ├── Library_Inventory_Week3_Testing_and_Debugging_Report.docx # Week 3 QA Document (~1,590 words)
-│   └── library-inventory-system-week3-tests.zip       # Week 3 Complete Source & Test package
+│   ├── library-inventory-system-week3-tests.zip       # Week 3 Source & Test package
+│   ├── Library_Inventory_Week4_Refactoring_and_Optimization_Report.docx # Week 4 Document (~1,610 words)
+│   └── library-inventory-system-week4-refactored.zip  # Week 4 Refactored Source package
 ├── lib/
 │   └── junit-platform-console-standalone-1.10.2.jar   # Standalone JUnit 5 Console Runner
 └── src/
@@ -118,19 +145,20 @@ retail-inventory-management-system/
     │   ├── model/Inventory.java & Product.java        # Week 1 Retail Models
     │   ├── service/InventoryService.java              # Week 1 Retail Service
     │   ├── util/DatabaseConnectionManager.java        # Week 1 Singleton Manager
-    │   └── library/                                   # Week 2-3 Library Core Implementation
-    │       ├── cli/LibraryConsoleApp.java             # Menu-driven CLI Application
+    │   └── library/                                   # Week 2-4 Library Core Implementation
+    │       ├── cli/LibraryConsoleApp.java             # Menu-driven CLI with Sorting & Pagination
     │       ├── exception/                             # Custom Exceptions
     │       │   ├── BookNotFoundException.java
     │       │   ├── DuplicateBookException.java
     │       │   └── InvalidBookDataException.java
-    │       ├── model/Book.java                        # Encapsulated Book Entity
+    │       ├── model/Book.java                        # Encapsulated Book Entity with Builder Pattern
     │       ├── repository/                            # Collections Repository
-    │       │   ├── BookRepository.java                # Repository Contract
-    │       │   └── InMemoryBookRepository.java        # LinkedHashMap Storage
-    │       └── service/BookService.java               # Validation & Business Operations
+    │       │   ├── BookRepository.java                # Repository Contract with Pagination
+    │       │   └── InMemoryBookRepository.java        # ReadWriteLock & Inverted Index Storage
+    │       ├── service/BookService.java               # Business Rules, Sorting & Page Delegation
+    │       └── util/BookValidator.java                # Centralized DRY Domain Validator
     └── test/java/com/inventory/library/
-        ├── BookServiceUnitTest.java                   # JUnit 5 Comprehensive Test Suite (34 Tests)
+        ├── BookServiceUnitTest.java                   # JUnit 5 Comprehensive Test Suite (38 Tests)
         └── LibraryTestRunner.java                     # Standalone Zero-Dependency Test Runner (20 Tests)
 ```
 
@@ -146,20 +174,20 @@ retail-inventory-management-system/
 javac -cp "lib/*;bin" -d bin src/main/java/com/inventory/**/*.java src/test/java/com/inventory/**/*.java
 ```
 
-### 2. Run the JUnit 5 Jupiter Test Suite
+### 2. Run the JUnit 5 Jupiter Test Suite (38 Tests)
 ```bash
-java -jar lib/junit-platform-console-standalone-1.10.2.jar --class-path bin --select-class com.inventory.library.BookServiceUnitTest --details=tree
+java -jar lib/junit-platform-console-standalone-1.10.2.jar execute --class-path bin --select-class com.inventory.library.BookServiceUnitTest --details=tree
 ```
 
 #### JUnit 5 Execution Summary:
 ```text
-Test run finished after 215 ms
-[        13 containers found      ]
-[        13 containers started    ]
-[        13 containers successful ]
-[        34 tests found           ]
-[        34 tests started         ]
-[        34 tests successful      ]
+Test run finished after 219 ms
+[        14 containers found      ]
+[        14 containers started    ]
+[        14 containers successful ]
+[        38 tests found           ]
+[        38 tests started         ]
+[        38 tests successful      ]
 [         0 tests failed          ]
 ```
 
@@ -168,7 +196,7 @@ Test run finished after 215 ms
 java -cp bin com.inventory.library.LibraryTestRunner
 ```
 
-### 4. Run the Interactive CLI Application
+### 4. Run the Refactored Interactive CLI Application
 ```bash
 java -cp bin com.inventory.library.cli.LibraryConsoleApp
 ```
@@ -191,4 +219,9 @@ java -cp bin com.inventory.library.cli.LibraryConsoleApp
 * **Report File:** [`docs/Library_Inventory_Week3_Testing_and_Debugging_Report.docx`](docs/Library_Inventory_Week3_Testing_and_Debugging_Report.docx)
 * **Test Package Archive:** [`docs/library-inventory-system-week3-tests.zip`](docs/library-inventory-system-week3-tests.zip)
 * **JUnit 5 Test Suite:** [`src/test/java/com/inventory/library/BookServiceUnitTest.java`](src/test/java/com/inventory/library/BookServiceUnitTest.java)
-* **Debugging Case Studies:** Documented in Week 3 Report and README
+
+### Week 4 Deliverables
+* **Report File:** [`docs/Library_Inventory_Week4_Refactoring_and_Optimization_Report.docx`](docs/Library_Inventory_Week4_Refactoring_and_Optimization_Report.docx)
+* **Refactored Source Archive:** [`docs/library-inventory-system-week4-refactored.zip`](docs/library-inventory-system-week4-refactored.zip)
+* **Optimized Classes:** `Book.java` (Builder), `InMemoryBookRepository.java` (ReadWriteLock & Inverted Index), `BookValidator.java` (DRY)
+* **Regression Test Suite:** 38 passing JUnit 5 tests

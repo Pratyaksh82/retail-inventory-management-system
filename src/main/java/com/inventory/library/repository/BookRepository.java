@@ -2,88 +2,79 @@ package com.inventory.library.repository;
 
 import com.inventory.library.model.Book;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Repository interface defining CRUD and query persistence operations for Book entities.
- * Follows the Data Access Object / Repository design pattern to decouple business
- * services from storage implementations.
+ * Repository interface defining persistence contracts for Book entities.
+ * Enhanced in Week 4 to support sorting and paginated queries for optimized
+ * memory and retrieval performance.
  */
 public interface BookRepository {
 
     /**
-     * Saves a new book into the repository.
-     *
-     * @param book Book to persist
-     * @return The persisted Book
+     * Persists a book in the repository.
      */
     Book save(Book book);
 
     /**
      * Locates a book by its unique ISBN.
-     *
-     * @param isbn Book ISBN
-     * @return Optional containing the book if found, empty otherwise
      */
     Optional<Book> findByIsbn(String isbn);
 
     /**
-     * Retrieves all books currently stored in the repository.
-     *
-     * @return List of all books
+     * Retrieves all books currently stored.
      */
     List<Book> findAll();
 
     /**
-     * Searches for books whose title contains the specified query (case-insensitive).
+     * Retrieves all books sorted by a given Comparator.
+     */
+    List<Book> findAll(Comparator<Book> comparator);
+
+    /**
+     * Retrieves a paginated subset of books, optionally sorted.
      *
-     * @param titleQuery Search text
-     * @return List of matching books
+     * @param pageNumber 1-based page index
+     * @param pageSize   Number of items per page
+     * @param comparator Sorting comparator (or null for default insertion order)
+     * @return Paginated list of books
+     */
+    List<Book> findPaged(int pageNumber, int pageSize, Comparator<Book> comparator);
+
+    /**
+     * Fast search for books matching title query.
      */
     List<Book> findByTitle(String titleQuery);
 
     /**
-     * Searches for books whose author contains the specified query (case-insensitive).
-     *
-     * @param authorQuery Search text
-     * @return List of matching books
+     * Fast search for books matching author query.
      */
     List<Book> findByAuthor(String authorQuery);
 
     /**
-     * Checks if a book exists with the given ISBN.
-     *
-     * @param isbn Book ISBN
-     * @return True if exists, false otherwise
+     * Checks if a book exists by ISBN.
      */
     boolean existsByIsbn(String isbn);
 
     /**
-     * Updates the details of an existing book.
-     *
-     * @param book Book with updated attributes
-     * @return True if updated successfully, false if not found
+     * Updates an existing book.
      */
     boolean update(Book book);
 
     /**
-     * Deletes a book matching the given ISBN.
-     *
-     * @param isbn Book ISBN to delete
-     * @return True if deleted, false if not found
+     * Deletes a book by ISBN.
      */
     boolean deleteByIsbn(String isbn);
 
     /**
-     * Returns the total count of books in inventory.
-     *
-     * @return Count of books
+     * Total count of books.
      */
     int count();
 
     /**
-     * Clears all stored books (primarily for test resets).
+     * Clears all stored books.
      */
     void clear();
 }

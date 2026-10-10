@@ -15,8 +15,10 @@ import java.util.Scanner;
  * Menu-driven Command-Line Interface (CLI) application for managing
  * a library's book inventory.
  *
- * Implements full CRUD functionality, input validation, robust exception handling,
- * and clear user feedback.
+ * Refactored in Week 4:
+ * - Employs Book.builder() for cleaner entity construction.
+ * - Adds dynamic sorting (by Title, Author, Year, ISBN) and pagination.
+ * - Formatted tabular layout with performance latency metrics.
  */
 public class LibraryConsoleApp {
 
@@ -41,14 +43,20 @@ public class LibraryConsoleApp {
     }
 
     /**
-     * Preloads initial sample books to demonstrate functionality immediately.
+     * Preloads initial sample books using the Builder pattern.
      */
     public void preloadSampleData() {
         try {
-            bookService.addBook(new Book("978-0134685991", "Effective Java", "Joshua Bloch", 2018));
-            bookService.addBook(new Book("978-0596009205", "Head First Java", "Kathy Sierra", 2022));
-            bookService.addBook(new Book("978-0132350884", "Clean Code", "Robert C. Martin", 2008));
-            bookService.addBook(new Book("978-0201633610", "Design Patterns (GoF)", "Erich Gamma et al.", 1994));
+            bookService.addBook(Book.builder()
+                    .isbn("978-0134685991").title("Effective Java").author("Joshua Bloch").publicationYear(2018).build());
+            bookService.addBook(Book.builder()
+                    .isbn("978-0596009205").title("Head First Java").author("Kathy Sierra").publicationYear(2022).build());
+            bookService.addBook(Book.builder()
+                    .isbn("978-0132350884").title("Clean Code").author("Robert C. Martin").publicationYear(2008).build());
+            bookService.addBook(Book.builder()
+                    .isbn("978-0201633610").title("Design Patterns (GoF)").author("Erich Gamma et al.").publicationYear(1994).build());
+            bookService.addBook(Book.builder()
+                    .isbn("978-0131103627").title("The C Programming Language").author("Brian W. Kernighan").publicationYear(1988).build());
         } catch (Exception ignored) {
             // Safe fallback during boot
         }
@@ -63,25 +71,26 @@ public class LibraryConsoleApp {
 
         while (running) {
             printMenu();
-            System.out.print("👉 Enter your choice [1-8]: ");
+            System.out.print("👉 Enter your choice [1-9]: ");
             String input = scanner.nextLine().trim();
 
             System.out.println();
             switch (input) {
                 case "1" -> handleAddBook();
                 case "2" -> handleListBooks();
-                case "3" -> handleSearchByIsbn();
-                case "4" -> handleSearchByKeyword();
-                case "5" -> handleUpdateBook();
-                case "6" -> handleDeleteBook();
-                case "7" -> handleDisplayStatistics();
-                case "8" -> {
+                case "3" -> handleListBooksSortedOrPaged();
+                case "4" -> handleSearchByIsbn();
+                case "5" -> handleSearchByKeyword();
+                case "6" -> handleUpdateBook();
+                case "7" -> handleDeleteBook();
+                case "8" -> handleDisplayStatistics();
+                case "9" -> {
                     running = false;
                     System.out.println("======================================================");
                     System.out.println("  Thank you for using Library Book Inventory System!  ");
                     System.out.println("======================================================");
                 }
-                default -> System.out.println("⚠️  Invalid choice! Please select an option between 1 and 8.");
+                default -> System.out.println("⚠️  Invalid choice! Please select an option between 1 and 9.");
             }
             System.out.println();
         }
@@ -90,7 +99,7 @@ public class LibraryConsoleApp {
     private void printHeader() {
         System.out.println("======================================================");
         System.out.println("      📚 LIBRARY BOOK INVENTORY MANAGEMENT SYSTEM      ");
-        System.out.println("      Core Functionality - Java Application (Week 2)   ");
+        System.out.println("      Week 4: Refactored & Optimized Java Architecture ");
         System.out.println("======================================================");
     }
 
@@ -99,13 +108,14 @@ public class LibraryConsoleApp {
         System.out.println(" MAIN MENU");
         System.out.println("------------------------------------------------------");
         System.out.println(" 1. ➕ Add New Book (Create)");
-        System.out.println(" 2. 📋 View All Books (Read / List)");
-        System.out.println(" 3. 🔍 Search Book by ISBN");
-        System.out.println(" 4. 🔎 Search Books by Title or Author");
-        System.out.println(" 5. ✏️  Update Book Information (Update)");
-        System.out.println(" 6. 🗑️  Delete Book (Delete)");
-        System.out.println(" 7. 📊 View Inventory Statistics");
-        System.out.println(" 8. 🚪 Exit Application");
+        System.out.println(" 2. 📋 View All Books (Default Order)");
+        System.out.println(" 3. 🔢 View Books (Sorted / Paginated)");
+        System.out.println(" 4. 🔍 Search Book by ISBN (O(1) Lookup)");
+        System.out.println(" 5. 🔎 Search Books by Title / Author (Token Indexed)");
+        System.out.println(" 6. ✏️  Update Book Information");
+        System.out.println(" 7. 🗑️  Delete Book");
+        System.out.println(" 8. 📊 View Inventory Statistics");
+        System.out.println(" 9. 🚪 Exit Application");
         System.out.println("------------------------------------------------------");
     }
 
@@ -126,10 +136,18 @@ public class LibraryConsoleApp {
             System.out.print("Enter Publication Year: ");
             int year = readIntegerInput();
 
-            Book newBook = new Book(isbn, title, author, year);
-            bookService.addBook(newBook);
+            Book newBook = Book.builder()
+                    .isbn(isbn)
+                    .title(title)
+                    .author(author)
+                    .publicationYear(year)
+                    .build();
 
-            System.out.println("✅ Book added successfully!");
+            long start = System.nanoTime();
+            bookService.addBook(newBook);
+            long elapsedMicros = (System.nanoTime() - start) / 1000;
+
+            System.out.println("✅ Book added successfully! [Operation time: " + elapsedMicros + " µs]");
             System.out.println("   " + newBook);
         } catch (DuplicateBookException | InvalidBookDataException e) {
             System.out.println("❌ Error: " + e.getMessage());
@@ -140,8 +158,38 @@ public class LibraryConsoleApp {
 
     private void handleListBooks() {
         System.out.println("--- 📋 ALL BOOKS IN INVENTORY ---");
+        long start = System.nanoTime();
         List<Book> books = bookService.getAllBooks();
+        long elapsedMicros = (System.nanoTime() - start) / 1000;
         displayBookTable(books);
+        System.out.println("⏱️  Query latency: " + elapsedMicros + " µs");
+    }
+
+    private void handleListBooksSortedOrPaged() {
+        System.out.println("--- 🔢 SORTED & PAGINATED CATALOG ---");
+        System.out.println("Sort by: 1. Title | 2. Author | 3. Publication Year | 4. ISBN");
+        System.out.print("Select sort field [1-4, Enter for default]: ");
+        String sortChoice = scanner.nextLine().trim();
+
+        Comparator<Book> comparator = switch (sortChoice) {
+            case "1" -> Comparator.comparing(Book::getTitle, String.CASE_INSENSITIVE_ORDER);
+            case "2" -> Comparator.comparing(Book::getAuthor, String.CASE_INSENSITIVE_ORDER);
+            case "3" -> Comparator.comparingInt(Book::getPublicationYear);
+            case "4" -> Comparator.comparing(Book::getIsbn);
+            default -> null;
+        };
+
+        System.out.print("Enter Page Number (default 1): ");
+        String pStr = scanner.nextLine().trim();
+        int page = pStr.isEmpty() ? 1 : Math.max(1, Integer.parseInt(pStr));
+
+        System.out.print("Enter Page Size (default 5): ");
+        String psStr = scanner.nextLine().trim();
+        int pageSize = psStr.isEmpty() ? 5 : Math.max(1, Integer.parseInt(psStr));
+
+        List<Book> pagedBooks = bookService.getBooksPaged(page, pageSize, comparator);
+        System.out.println("\nPage " + page + " (Page size: " + pageSize + "):");
+        displayBookTable(pagedBooks);
     }
 
     private void handleSearchByIsbn() {
@@ -149,9 +197,11 @@ public class LibraryConsoleApp {
         System.out.print("Enter ISBN to search: ");
         String isbn = scanner.nextLine().trim();
 
+        long start = System.nanoTime();
         try {
             Book book = bookService.getBookByIsbn(isbn);
-            System.out.println("✅ Book found:");
+            long elapsedMicros = (System.nanoTime() - start) / 1000;
+            System.out.println("✅ Book found [Indexed lookup: " + elapsedMicros + " µs]:");
             System.out.println("   " + book);
         } catch (BookNotFoundException | InvalidBookDataException e) {
             System.out.println("❌ " + e.getMessage());
@@ -163,11 +213,14 @@ public class LibraryConsoleApp {
         System.out.print("Enter search keyword: ");
         String keyword = scanner.nextLine().trim();
 
+        long start = System.nanoTime();
         List<Book> matches = bookService.searchBooks(keyword);
+        long elapsedMicros = (System.nanoTime() - start) / 1000;
+
         if (matches.isEmpty()) {
             System.out.println("ℹ️  No books found matching keyword '" + keyword + "'.");
         } else {
-            System.out.println("✅ Found " + matches.size() + " matching book(s):");
+            System.out.println("✅ Found " + matches.size() + " matching book(s) [Search time: " + elapsedMicros + " µs]:");
             displayBookTable(matches);
         }
     }

@@ -5,41 +5,37 @@ import com.inventory.library.exception.DuplicateBookException;
 import com.inventory.library.exception.InvalidBookDataException;
 import com.inventory.library.model.Book;
 import com.inventory.library.repository.BookRepository;
+import com.inventory.library.util.BookValidator;
 
-import java.time.Year;
 import java.util.*;
-import java.util.regex.Pattern;
 
 /**
- * Service layer orchestrating business rules, input validations, and CRUD operations
+ * Service layer orchestrating business operations, validation rules, and lifecycle logic
  * for the Library Book Inventory application.
+ *
+ * Refactored in Week 4:
+ * - Delegates validation to DRY {@link BookValidator}.
+ * - Employs {@link Book.Builder} for safe mutation.
+ * - Added sorting and paginated retrieval capabilities.
  */
 public class BookService {
 
     private final BookRepository repository;
 
-    // Pattern for alphanumeric ISBN-10 or ISBN-13 (ignoring hyphens and spaces)
-    private static final Pattern ISBN_CLEAN_PATTERN = Pattern.compile("^[0-9]{9}[0-9X]$|^[0-9]{13}$");
-
     /**
      * Dependency injection constructor.
      *
-     * @param repository The book repository implementation to use
+     * @param repository The book repository implementation
      */
     public BookService(BookRepository repository) {
         this.repository = Objects.requireNonNull(repository, "BookRepository must not be null");
     }
 
     /**
-     * Adds a new book to the inventory after performing thorough validation.
-     *
-     * @param book The book entity to add
-     * @return The persisted book entity
-     * @throws InvalidBookDataException if validation fails
-     * @throws DuplicateBookException   if a book with the same ISBN already exists
+     * Adds a new book after executing domain validations and duplicate checks.
      */
     public Book addBook(Book book) {
-        validateBook(book);
+        BookValidator.validateBook(book);
 
         if (repository.existsByIsbn(book.getIsbn())) {
             throw new DuplicateBookException("A book with ISBN '" + book.getIsbn() + "' already exists in inventory.");
@@ -49,11 +45,7 @@ public class BookService {
     }
 
     /**
-     * Retrieves a book by its ISBN.
-     *
-     * @param isbn Target ISBN
-     * @return The Book entity
-     * @throws BookNotFoundException if no matching book is found
+     * Retrieves a book by ISBN.
      */
     public Book getBookByIsbn(String isbn) {
         if (isbn == null || isbn.isBlank()) {
@@ -65,19 +57,28 @@ public class BookService {
     }
 
     /**
-     * Returns all books currently in inventory.
-     *
-     * @return List of all books
+     * Retrieves all books in default insertion order.
      */
     public List<Book> getAllBooks() {
         return repository.findAll();
     }
 
     /**
+     * Retrieves all books sorted by a custom comparator.
+     */
+    public List<Book> getAllBooksSorted(Comparator<Book> comparator) {
+        return repository.findAll(comparator);
+    }
+
+    /**
+     * Retrieves paginated results.
+     */
+    public List<Book> getBooksPaged(int pageNumber, int pageSize, Comparator<Book> comparator) {
+        return repository.findPaged(pageNumber, pageSize, comparator);
+    }
+
+    /**
      * Searches for books matching title or author query.
-     *
-     * @param query Search query
-     * @return List of matching books without duplicates
      */
     public List<Book> searchBooks(String query) {
         if (query == null || query.isBlank()) {
@@ -92,39 +93,29 @@ public class BookService {
 
     /**
      * Updates an existing book's title, author, and publication year.
-     *
-     * @param isbn            ISBN of the book to update
-     * @param newTitle        Updated title
-     * @param newAuthor       Updated author
-     * @param newPubYear      Updated publication year
-     * @return The updated Book entity
-     * @throws BookNotFoundException   if book is not found
-     * @throws InvalidBookDataException if input values are invalid
      */
     public Book updateBook(String isbn, String newTitle, String newAuthor, int newPubYear) {
         Book existing = getBookByIsbn(isbn);
 
-        validateTitle(newTitle);
-        validateAuthor(newAuthor);
-        validatePublicationYear(newPubYear);
+        BookValidator.validateTitle(newTitle);
+        BookValidator.validateAuthor(newAuthor);
+        BookValidator.validatePublicationYear(newPubYear);
 
-        existing.setTitle(newTitle.trim());
-        existing.setAuthor(newAuthor.trim());
-        existing.setPublicationYear(newPubYear);
+        Book updated = existing.toBuilder()
+                .title(newTitle.trim())
+                .author(newAuthor.trim())
+                .publicationYear(newPubYear)
+                .build();
 
-        boolean updated = repository.update(existing);
-        if (!updated) {
+        boolean success = repository.update(updated);
+        if (!success) {
             throw new BookNotFoundException("Failed to update: Book with ISBN '" + isbn + "' no longer exists.");
         }
-        return existing;
+        return updated;
     }
 
     /**
      * Deletes a book by ISBN.
-     *
-     * @param isbn ISBN of the book to remove
-     * @return The deleted Book entity
-     * @throws BookNotFoundException if book is not found
      */
     public Book deleteBook(String isbn) {
         Book existing = getBookByIsbn(isbn);
@@ -136,69 +127,31 @@ public class BookService {
     }
 
     /**
-     * Returns total book count.
+     * Total count of books.
      */
     public int getTotalCount() {
         return repository.count();
     }
 
-    /**
-     * Validates complete Book entity.
-     */
+    // --- Backward-Compatible Validation Delegates (DRY) ---
+
     public void validateBook(Book book) {
-        if (book == null) {
-            throw new InvalidBookDataException("Book cannot be null.");
-        }
-        validateIsbn(book.getIsbn());
-        validateTitle(book.getTitle());
-        validateAuthor(book.getAuthor());
-        validatePublicationYear(book.getPublicationYear());
+        BookValidator.validateBook(book);
     }
 
-    /**
-     * Validates ISBN syntax (accepts ISBN-10 or ISBN-13 with/without hyphens).
-     */
     public void validateIsbn(String isbn) {
-        if (isbn == null || isbn.isBlank()) {
-            throw new InvalidBookDataException("ISBN is required and cannot be blank.");
-        }
-        String clean = isbn.replaceAll("[\\s-]", "").toUpperCase();
-        if (!ISBN_CLEAN_PATTERN.matcher(clean).matches()) {
-            throw new InvalidBookDataException("Invalid ISBN format '" + isbn + "'. Must be valid 10-digit or 13-digit ISBN.");
-        }
+        BookValidator.validateIsbn(isbn);
     }
 
-    /**
-     * Validates Title.
-     */
     public void validateTitle(String title) {
-        if (title == null || title.trim().isEmpty()) {
-            throw new InvalidBookDataException("Book title is required and cannot be blank.");
-        }
-        if (title.trim().length() > 250) {
-            throw new InvalidBookDataException("Book title is too long (maximum 250 characters).");
-        }
+        BookValidator.validateTitle(title);
     }
 
-    /**
-     * Validates Author.
-     */
     public void validateAuthor(String author) {
-        if (author == null || author.trim().isEmpty()) {
-            throw new InvalidBookDataException("Author name is required and cannot be blank.");
-        }
-        if (author.trim().length() > 150) {
-            throw new InvalidBookDataException("Author name is too long (maximum 150 characters).");
-        }
+        BookValidator.validateAuthor(author);
     }
 
-    /**
-     * Validates Publication Year.
-     */
     public void validatePublicationYear(int year) {
-        int maxAllowedYear = Year.now().getValue() + 1; // allow books announced for upcoming year
-        if (year < 1400 || year > maxAllowedYear) {
-            throw new InvalidBookDataException("Publication year must be between 1400 and " + maxAllowedYear + " (got: " + year + ").");
-        }
+        BookValidator.validatePublicationYear(year);
     }
 }

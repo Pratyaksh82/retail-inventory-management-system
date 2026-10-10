@@ -14,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Year;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -283,6 +284,83 @@ public class BookServiceUnitTest {
         void testMalformedIsbnThrowsException(String invalidIsbn) {
             Book book = new Book(invalidIsbn, "Valid Title", "Valid Author", 2020);
             assertThrows(InvalidBookDataException.class, () -> bookService.addBook(book));
+        }
+    }
+
+    @Nested
+    @DisplayName("Week 4 Refactoring & Optimization Tests")
+    class RefactoringAndOptimizationTests {
+
+        @Test
+        @DisplayName("Builder Pattern: Construct Book entity with fluent Builder")
+        void testBookBuilderPattern() {
+            Book book = Book.builder()
+                    .isbn("978-0134685991")
+                    .title("Effective Java")
+                    .author("Joshua Bloch")
+                    .publicationYear(2018)
+                    .build();
+
+            assertEquals("978-0134685991", book.getIsbn());
+            assertEquals("Effective Java", book.getTitle());
+            assertEquals("Joshua Bloch", book.getAuthor());
+            assertEquals(2018, book.getPublicationYear());
+        }
+
+        @Test
+        @DisplayName("Sorting: Retrieve books sorted by title alphabetically")
+        void testGetBooksSortedByTitle() {
+            bookService.addBook(new Book("978-0000000003", "Zebra Patterns", "Author Z", 2010));
+            bookService.addBook(new Book("978-0000000001", "Algorithms in Java", "Author A", 2015));
+            bookService.addBook(new Book("978-0000000002", "Data Structures", "Author D", 2020));
+
+            List<Book> sorted = bookService.getAllBooksSorted(Comparator.comparing(Book::getTitle));
+            assertEquals("Algorithms in Java", sorted.get(0).getTitle());
+            assertEquals("Data Structures", sorted.get(1).getTitle());
+            assertEquals("Zebra Patterns", sorted.get(2).getTitle());
+        }
+
+        @Test
+        @DisplayName("Pagination: Retrieve specific page subset with pageSize")
+        void testGetBooksPaged() {
+            for (int i = 1; i <= 10; i++) {
+                String isbn = String.format("978-00000000%02d", i);
+                bookService.addBook(new Book(isbn, "Book Title " + i, "Author " + i, 2000 + i));
+            }
+
+            assertEquals(10, bookService.getTotalCount());
+
+            // Page 1, size 3
+            List<Book> page1 = bookService.getBooksPaged(1, 3, null);
+            assertEquals(3, page1.size());
+            assertEquals("Book Title 1", page1.get(0).getTitle());
+
+            // Page 2, size 3
+            List<Book> page2 = bookService.getBooksPaged(2, 3, null);
+            assertEquals(3, page2.size());
+            assertEquals("Book Title 4", page2.get(0).getTitle());
+
+            // Page 4, size 3 (only 1 item remaining)
+            List<Book> page4 = bookService.getBooksPaged(4, 3, null);
+            assertEquals(1, page4.size());
+            assertEquals("Book Title 10", page4.get(0).getTitle());
+        }
+
+        @Test
+        @DisplayName("Inverted Index Search: Fast keyword token search")
+        void testInvertedIndexTokenSearch() {
+            bookService.addBook(new Book("978-0134685991", "Effective Java Programming", "Joshua Bloch", 2018));
+            bookService.addBook(new Book("978-0596009205", "Head First Java", "Kathy Sierra", 2022));
+
+            // Token search on title
+            List<Book> effectiveMatches = bookService.searchBooks("effective");
+            assertEquals(1, effectiveMatches.size());
+            assertEquals("Effective Java Programming", effectiveMatches.get(0).getTitle());
+
+            // Token search on author
+            List<Book> blochMatches = bookService.searchBooks("bloch");
+            assertEquals(1, blochMatches.size());
+            assertEquals("Joshua Bloch", blochMatches.get(0).getAuthor());
         }
     }
 }
